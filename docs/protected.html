@@ -1,1 +1,45 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Private Detail | Protected</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="./assets/styles.css">
+</head>
+<body>
+  <main class="container">
+    <article class="card">
+      <header>
+        <h2>상세 페이지</h2>
+        <p class="muted">허용된 사용자만 볼 수 있어요 ✨</p>
+      </header>
 
+      <p>여기에 비공개 콘텐츠를 넣으세요.</p>
+
+      <footer class="grid">
+        <a role="button" href="./index.html" class="secondary">홈으로</a>
+        <button id="btn-logout" class="contrast">로그아웃</button>
+      </footer>
+    </article>
+  </main>
+
+  <script>
+    const WORKER_BASE = "https://x-gate.<your-subdomain>.workers.dev";
+
+    // 페이지 로드시 세션 확인 (쿠키 기반)
+    (async () => {
+      const res = await fetch(WORKER_BASE + "/api/check-session", { credentials: "include" });
+      if (!res.ok) {
+        alert("세션이 없거나 만료되었습니다.");
+        location.href = "./index.html";
+      }
+    })();
+
+    document.getElementById("btn-logout").addEventListener("click", async () => {
+      await fetch(WORKER_BASE + "/api/logout", { credentials: "include" });
+      location.href = "./index.html";
+    });
+  </script>
+</body>
+</html>
