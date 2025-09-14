@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Private Detail | Landing</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Pico.css (경량 프레임워크) -->
+  <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="./assets/styles.css">
+</head>
+<body>
+  <main class="container">
+    <article class="card">
+      <header>
+        <h1>Private Detail</h1>
+        <p class="muted">사전 승인된 아이디만 입장 가능합니다.</p>
+      </header>
+
+      <form id="invite-form">
+        <label>초대코드(선택)
+          <input type="text" id="invite" placeholder="예: CODE123" />
+        </label>
+
+        <div class="grid">
+          <button type="button" id="btn-login" class="contrast">X로 로그인</button>
+          <button type="button" id="btn-demo">데모로 입장(모의)</button>
+        </div>
+        <small class="muted">※ 실제 로그인은 Cloudflare Worker의 <code>/auth/login</code>로 이동합니다.</small>
+      </form>
+    </article>
+  </main>
+
+  <script>
+    // Worker 베이스 URL (배포 후 workers.dev 주소나 커스텀 도메인으로 교체)
+    const WORKER_BASE = "https://x-gate.<your-subdomain>.workers.dev";
+
+    document.getElementById("btn-login").addEventListener("click", () => {
+      const code = document.getElementById("invite").value.trim();
+      // 실제 구현이라면 state/pkce와 함께 /auth/login으로 이동
+      // 초대코드를 콜백에 전달하고 싶다면 쿼리에 포함
+      const url = new URL(WORKER_BASE + "/auth/login");
+      if (code) url.searchParams.set("invite", code);
+      location.href = url.toString();
+    });
+
+    // "데모" 버튼: OAuth 없이 게이트 API 호출(모의 userId)
+    document.getElementById("btn-demo").addEventListener("click", async () => {
+      const code = document.getElementById("invite").value.trim();
+      const userId = prompt("데모용: 자신의 Twitter 숫자 ID를 입력(allowlist에 있으면 통과)","");
+      if (!userId) return;
+
+      const res = await fetch(WORKER_BASE + "/api/check-gate", {
+        method: "POST",
+        headers: { "Content-Type":"application/json" },
+        body: JSON.stringify({ userId, code })
+      });
+      const j = await res.json().catch(()=>({}));
+      if (j.ok) {
+        location.href = "./protected.html";
+      } else {
+        alert("접근 불가(허용리스트/초대 불일치)");
+      }
+    });
+  </script>
+</body>
+</html>
