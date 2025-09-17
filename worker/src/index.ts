@@ -101,12 +101,13 @@ export default {
 
     // --- (A) 디버그 라우트: 현재 CORS 설정 확인 ---
     if (url.pathname === "/__debug/cors") {
-      const info = {
-        origin: reqOrigin,                   // 이 요청의 Origin
-        allowed_env: env.ALLOWED_ORIGIN || null, // wrangler.toml [vars]
+      const body = JSON.stringify({
+        origin: req.headers.get("Origin"),
+        allowed_env: env.ALLOWED_ORIGIN || null,
         method: req.method
-      };
-      return jsonRespond(info); // CORS 헤더(있으면)까지 붙여서 반환
+      });
+      const res = new Response(body, { headers: { "content-type":"application/json" } });
+      return allowOrigin ? applyCORS(res, allowOrigin) : res; // applyCORS는 앞서 썼던 안전 복제 함수
     }
     
     // --- (B) OPTIONS 프리플라이트 ---
