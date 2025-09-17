@@ -195,7 +195,7 @@ export default {
       if (url.pathname === "/api/logout") {
         return respond(
           new Response("OK", {
-            headers: { "Set-Cookie": cookieSerialize("xgate", "", { maxAge: 0 }) },
+            headers: { "Set-Cookie": cookieSerialize("xgate", token, { maxAge: 60*60*24*7 }) },
           })
         );
       }
