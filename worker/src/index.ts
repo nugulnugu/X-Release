@@ -195,32 +195,35 @@ export default {
       if (url.pathname === "/api/logout") {
         return respond(
           new Response("OK", {
-            headers: { "Set-Cookie": cookieSerialize("xgate", token, { maxAge: 60*60*24*7 }) },
+            headers: { "Set-Cookie": cookieSerialize("xgate", "", { maxAge: 0 }) },
           })
         );
       }
+
 
       /* --- 3) 게이트 --- */
       if (url.pathname === "/api/check-gate" && req.method === "POST") {
         const body = await req.json().catch(() => ({}));
         const userId = String((body as any).userId || "");
         const code = (body as any).code ? String((body as any).code) : undefined;
-
+      
         const { allow, invites } = parseLists(env);
         const invited = code && Array.isArray(invites[code]) && invites[code].includes(userId);
-
+      
         if (allow.has(userId) || invited) {
           const token = await signJWT({ userId }, env.JWT_SECRET);
           return respond(
             new Response(JSON.stringify({ ok: true }), {
               headers: {
                 "content-type": "application/json",
-                "Set-Cookie": cookieSerialize("xgate", token, { maxAge: 60 * 60 * 24 * 7 }), // 7일
+                "Set-Cookie": cookieSerialize("xgate", token, { maxAge: 60 * 60 * 24 * 7 }),
               },
             })
           );
         }
-        return jsonRespond({ ok: false }, { status: 403 });
+      
+        // 디버그용으로 어떤 userId/allowlist인지 로그 찍어보기
+        return jsonRespond({ ok: false, reason: "not-allowed", userId, allow: [...allow] }, { status: 403 });
       }
 
       /* --- 4) 로그인 시작 (OAuth 2.0 + PKCE) --- */
