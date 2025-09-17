@@ -10,7 +10,7 @@ export interface Env {
   HOME_PAGE_URL: string;
 
   // CORS 허용 오리진(콤마로 여러 개 가능)
-  ALLOWED_ORIGIN: string;
+  ALLOWED_ORIGIN: string; // 예: "https://nugulnugu.github.io"
 }
 
 /* ---------- small utils ---------- */
@@ -136,8 +136,7 @@ export default {
       const allowOrigin = getAllowedOrigin(reqOrigin, env);
 
       const respond = (res: Response) => (allowOrigin ? applyCORS(res, allowOrigin) : res);
-      const jsonRespond = (data: any, init: ResponseInit = {}) =>
-        respond(json(data, init));
+      const jsonRespond = (data: any, init: ResponseInit = {}) => respond(json(data, init));
 
       /* --- debug: check CORS vars at runtime --- */
       if (url.pathname === "/__debug/cors") {
@@ -301,4 +300,34 @@ export default {
         const clearTmp = [
           "x_state=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=None",
           "x_cv=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=None",
-          "x_inv=; Path=/;_
+          "x_inv=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=None",
+        ];
+
+        if (allow.has(userId) || invited) {
+          const token = await signJWT({ userId }, env.JWT_SECRET);
+          return new Response(null, {
+            status: 302,
+            headers: {
+              "Set-Cookie": [cookieSerialize("xgate", token, { maxAge: 60 * 60 * 24 * 7 }), ...clearTmp].join(", "),
+              Location: env.PROTECTED_PAGE_URL,
+            },
+          });
+        }
+
+        return new Response(null, {
+          status: 302,
+          headers: {
+            "Set-Cookie": clearTmp.join(", "),
+            Location: env.HOME_PAGE_URL,
+          },
+        });
+      }
+
+      /* --- default --- */
+      return respond(new Response("OK"));
+    } catch (e: any) {
+      // 배포 중 디버깅용(원인 파악 후 필요시 메시지 축소)
+      return new Response(`Internal Error: ${e?.message || e}`, { status: 500 });
+    }
+  },
+};
