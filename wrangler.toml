@@ -7,7 +7,7 @@ compatibility_date = "2025-09-15"
 
 [vars]
 # 사전 검증된 '상호팔로우+초대조건 충족' 사용자 목록 (숫자 Twitter ID 문자열)
-ALLOWLIST_JSON = '["123456","987654"]'
+ALLOWLIST_JSON = '["1542749919810686976","987654"]'
 
 # 초대코드 -> userId 배열(최대 3개)
 INVITES_JSON = '{"CODE123":["1111","2222"],"BETA999":["3333"]}'
