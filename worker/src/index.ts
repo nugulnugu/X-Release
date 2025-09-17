@@ -96,8 +96,15 @@ function splitOrigins(val?: string) {
 }
 function getAllowedOrigin(reqOrigin: string | null, env: Env) {
   if (!reqOrigin) return null;
-  const list = splitOrigins(env.ALLOWED_ORIGIN);
-  return list.length && list.includes(reqOrigin) ? reqOrigin : null;
+
+  // 1) toml/dash에 지정된 명시 리스트
+  const allowed = new Set(splitOrigins(env.ALLOWED_ORIGIN));
+
+  // 2) 홈/보호페이지의 오리진을 자동으로 허용 (바인딩이 빠져도 안전)
+  try { allowed.add(new URL(env.HOME_PAGE_URL).origin); } catch {}
+  try { allowed.add(new URL(env.PROTECTED_PAGE_URL).origin); } catch {}
+
+  return allowed.has(reqOrigin) ? reqOrigin : null;
 }
 
 /* ---------- PKCE helpers ---------- */
