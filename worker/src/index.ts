@@ -140,3 +140,11 @@ export default {
     return new Response("OK");
   }
 };
+
+function withCORS(res: Response, origin: string) {
+  const h = new Headers(res.headers);
+  h.set("Access-Control-Allow-Origin", origin); // 정확한 오리진(별표 X)
+  h.set("Access-Control-Allow-Credentials", "true");
+  h.set("Vary", "Origin");
+  return new Response(res.body, { ...res, headers: h });
+}
