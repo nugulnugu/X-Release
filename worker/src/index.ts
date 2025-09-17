@@ -96,30 +96,29 @@ export default {
   async fetch(req: Request, env: Env) {
     const url = new URL(req.url);
     const reqOrigin = req.headers.get("Origin");
-    const origin = getAllowedOrigin(reqOrigin, env);
-    const allowed = isAllowedOrigin(origin, env) ? origin! : null;
+    const allowOrigin = getAllowedOrigin(reqOrigin, env);
 
     // 공통 래퍼: 허용 오리진이면 CORS 헤더를 붙여 반환
-    const respond = (res: Response) => (allowed ? applyCORS(res, allowed) : res);
-    const jsonRespond = (data: any, init: ResponseInit = {}) => respond(json(data, init));
+    const respond = (res: Response) => (allowOrigin ? applyCORS(res, allowOrigin) : res);
+      const jsonRespond = (data: any, init: ResponseInit = {}) =>
+        respond(new Response(JSON.stringify(data), { headers: { "content-type": "application/json" }, ...init }));
 
     // --- OPTIONS 프리플라이트 처리 ---
     if (req.method === "OPTIONS") {
-      // 허용 오리진일 때만 CORS 응답을 붙임
-      if (allowed) {
-        const acrh = req.headers.get("Access-Control-Request-Headers") || "content-type";
-        const headers = new Headers({
-          "Access-Control-Allow-Origin": allowed,
-          "Access-Control-Allow-Credentials": "true",
-          "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-          "Access-Control-Allow-Headers": acrh,
-          "Vary": "Origin"
-        });
-        return new Response(null, { headers });
+        if (allowOrigin) {
+          const acrh = req.headers.get("Access-Control-Request-Headers") || "content-type";
+          return new Response(null, {
+            headers: {
+              "Access-Control-Allow-Origin": allowOrigin,
+              "Access-Control-Allow-Credentials": "true",
+              "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+              "Access-Control-Allow-Headers": acrh,
+              "Vary": "Origin",
+            },
+          });
+        }
+        return new Response(null, { status: 204 });
       }
-      // 허용 오리진이 아니면 빈 204 응답
-      return new Response(null, { status: 204 });
-    }
 
     // 1) 세션 확인
     if (url.pathname === "/api/check-session") {
@@ -190,5 +189,8 @@ export default {
     }
 
     return respond(new Response("OK"));
-  }
+  } catch (e: any) {
+      // 디버깅을 위해 1101 원인을 바로 확인 (배포 후에는 메시지 제거 권장)
+      return new Response(`Internal Error: ${e?.message || e}`, { status: 500 });
+    }
 };
