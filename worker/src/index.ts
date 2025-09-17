@@ -97,15 +97,21 @@ function splitOrigins(val?: string) {
 function getAllowedOrigin(reqOrigin: string | null, env: Env) {
   if (!reqOrigin) return null;
 
-  // 1) toml/dash에 지정된 명시 리스트
-  const allowed = new Set(splitOrigins(env.ALLOWED_ORIGIN));
+  // 1) toml/dashboard에 명시된 목록(콤마 구분)
+  const list = (env.ALLOWED_ORIGIN || "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean);
 
-  // 2) 홈/보호페이지의 오리진을 자동으로 허용 (바인딩이 빠져도 안전)
-  try { allowed.add(new URL(env.HOME_PAGE_URL).origin); } catch {}
-  try { allowed.add(new URL(env.PROTECTED_PAGE_URL).origin); } catch {}
+  // 2) HOME_PAGE_URL / PROTECTED_PAGE_URL의 오리진도 자동 허용
+  try { list.push(new URL(env.HOME_PAGE_URL).origin); } catch {}
+  try { list.push(new URL(env.PROTECTED_PAGE_URL).origin); } catch {}
 
+  // 중복 제거 후 매칭
+  const allowed = new Set(list);
   return allowed.has(reqOrigin) ? reqOrigin : null;
 }
+
 
 /* ---------- PKCE helpers ---------- */
 function base64url(buf: ArrayBuffer | Uint8Array) {
