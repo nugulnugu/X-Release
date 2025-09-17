@@ -21,42 +21,47 @@ function json(data: any, init: ResponseInit = {}) {
   });
 }
 
-/* ---------- JWT (demo-safe) ---------- */
+function base64url(buf: Uint8Array) {
+  let str = btoa(String.fromCharCode(...buf));
+  return str.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64urlEncodeStr(str: string) {
+  return base64url(new TextEncoder().encode(str));
+}
+
 async function signJWT(payload: object, secret: string) {
-  const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const body = btoa(JSON.stringify(payload));
-  const enc = new TextEncoder();
+  const header = base64urlEncodeStr(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const body = base64urlEncodeStr(JSON.stringify(payload));
+
   const key = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(secret),
+    "raw", new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
+    false, ["sign"]
   );
-  const sigBuf = await crypto.subtle.sign("HMAC", key, enc.encode(`${header}.${body}`));
-  const sig = btoa(String.fromCharCode(...new Uint8Array(sigBuf)));
+  const sigBuf = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${header}.${body}`));
+  const sig = base64url(new Uint8Array(sigBuf));
+
   return `${header}.${body}.${sig}`;
 }
 
 async function verifyJWT(token: string, secret: string) {
   try {
     const [h, b, s] = token.split(".");
-    const enc = new TextEncoder();
     const key = await crypto.subtle.importKey(
-      "raw",
-      enc.encode(secret),
+      "raw", new TextEncoder().encode(secret),
       { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"]
+      false, ["sign"]
     );
-    const sigBuf = await crypto.subtle.sign("HMAC", key, enc.encode(`${h}.${b}`));
-    const sig = btoa(String.fromCharCode(...new Uint8Array(sigBuf)));
+    const sigBuf = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${h}.${b}`));
+    const sig = base64url(new Uint8Array(sigBuf));
     if (sig !== s) return null;
-    return JSON.parse(atob(b));
+    return JSON.parse(atob(b.replace(/-/g, "+").replace(/_/g, "/")));
   } catch {
     return null;
   }
 }
+
 
 /* ---------- allowlist/invites ---------- */
 function parseLists(env: Env) {
