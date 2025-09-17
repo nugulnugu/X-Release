@@ -10,7 +10,7 @@ export interface Env {
   HOME_PAGE_URL: string;
 
   // CORS 허용 오리진(콤마로 여러 개 가능)
-  ALLOWED_ORIGIN: string; // 예: "https://nugulnugu.github.io"
+  CORS_ALLOWED_ORIGIN: string;
 }
 
 /* ---------- small utils ---------- */
@@ -98,7 +98,7 @@ function getAllowedOrigin(reqOrigin: string | null, env: Env) {
   if (!reqOrigin) return null;
 
   // 1) toml/dashboard에 명시된 목록(콤마 구분)
-  const list = (env.ALLOWED_ORIGIN || "")
+  const list = (env.CORS_ALLOWED_ORIGIN || "")
     .split(",")
     .map(s => s.trim())
     .filter(Boolean);
@@ -155,7 +155,7 @@ export default {
       if (url.pathname === "/__debug/cors") {
         return jsonRespond({
           origin: reqOrigin,
-          allowed_env: env.ALLOWED_ORIGIN || null,
+          allowed_env: env.CORS_ALLOWED_ORIGIN || null,
           method: req.method,
         });
       }
