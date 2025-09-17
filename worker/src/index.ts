@@ -89,7 +89,8 @@ function withCORS(res: Response, origin: string) {
 export default {
   async fetch(req: Request, env: Env) {
     const url = new URL(req.url);
-    const origin = req.headers.get("Origin");
+    const reqOrigin = req.headers.get("Origin");
+    const origin = getAllowedOrigin(reqOrigin, env);
     const allowed = isAllowedOrigin(origin, env) ? origin! : null;
 
     // 공통 래퍼: 허용 오리진이면 CORS 헤더를 붙여 반환
