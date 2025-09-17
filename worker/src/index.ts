@@ -9,6 +9,9 @@ export interface Env {
   INVITES_JSON: string;
   PROTECTED_PAGE_URL: string;
   HOME_PAGE_URL: string;
+
+  // 새로 추가: CORS 허용 오리진(정확한 스킴+호스트). 여러 개면 콤마로 구분.
+  ALLOWED_ORIGIN?: string; // 예: "https://nugulnugu.github.io"
 }
 
 function json(data: any, init: ResponseInit = {}) {
@@ -53,79 +56,121 @@ function parseLists(env: Env) {
   return { allow, invites };
 }
 
+// ⚠️ 크로스 사이트에서 쿠키 전송을 허용하려면 SameSite=None; Secure 가 필수입니다.
 function cookieSerialize(name: string, value: string, opt: { maxAge?: number } = {}) {
   const attrs = [
     `${name}=${value}`,
     "Path=/",
     "HttpOnly",
     "Secure",
-    "SameSite=Lax"
+    "SameSite=None" // ← Lax이면 cross-site fetch에 쿠키가 안 실립니다.
   ];
   if (opt.maxAge) attrs.push(`Max-Age=${opt.maxAge}`);
   return attrs.join("; ");
 }
 
+// ----- CORS 유틸 -----
+function splitOrigins(val?: string) {
+  return (val || "").split(",").map(s => s.trim()).filter(Boolean);
+}
+function isAllowedOrigin(origin: string | null, env: Env) {
+  if (!origin) return false;
+  const list = splitOrigins(env.ALLOWED_ORIGIN);
+  return list.length ? list.includes(origin) : false;
+}
+function withCORS(res: Response, origin: string) {
+  const h = new Headers(res.headers);
+  h.set("Access-Control-Allow-Origin", origin); // 정확한 오리진
+  h.set("Access-Control-Allow-Credentials", "true");
+  h.set("Vary", "Origin");
+  return new Response(res.body, { ...res, headers: h });
+}
+
 export default {
   async fetch(req: Request, env: Env) {
     const url = new URL(req.url);
+    const origin = req.headers.get("Origin");
+    const allowed = isAllowedOrigin(origin, env) ? origin! : null;
+
+    // 공통 래퍼: 허용 오리진이면 CORS 헤더를 붙여 반환
+    const respond = (res: Response) => (allowed ? withCORS(res, allowed) : res);
+    const jsonRespond = (data: any, init: ResponseInit = {}) => respond(json(data, init));
+
+    // --- OPTIONS 프리플라이트 처리 ---
+    if (req.method === "OPTIONS") {
+      // 허용 오리진일 때만 CORS 응답을 붙임
+      if (allowed) {
+        const acrh = req.headers.get("Access-Control-Request-Headers") || "content-type";
+        const headers = new Headers({
+          "Access-Control-Allow-Origin": allowed,
+          "Access-Control-Allow-Credentials": "true",
+          "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+          "Access-Control-Allow-Headers": acrh,
+          "Vary": "Origin"
+        });
+        return new Response(null, { headers });
+      }
+      // 허용 오리진이 아니면 빈 204 응답
+      return new Response(null, { status: 204 });
+    }
 
     // 1) 세션 확인
     if (url.pathname === "/api/check-session") {
       const token = (req.headers.get("Cookie") || "")
-        .split(";").map(s=>s.trim()).find(s=>s.startsWith("xgate="))?.split("=")[1];
-      if (!token) return json({ ok:false }, { status: 401 });
+        .split(";").map(s => s.trim()).find(s => s.startsWith("xgate="))?.split("=")[1];
+      if (!token) return jsonRespond({ ok:false }, { status: 401 });
       const payload = await verifyJWT(token, env.JWT_SECRET);
-      if (!payload) return json({ ok:false }, { status: 401 });
-      return json({ ok:true, payload });
+      if (!payload) return jsonRespond({ ok:false }, { status: 401 });
+      return jsonRespond({ ok:true, payload });
     }
 
     // 2) 로그아웃
     if (url.pathname === "/api/logout") {
-      return new Response("OK", {
+      return respond(new Response("OK", {
         headers: { "Set-Cookie": cookieSerialize("xgate", "", { maxAge: 0 }) }
-      });
+      }));
     }
 
-    // 3) 게이트(백엔드판정 API; 프론트에서 직접 호출해도 되고 콜백에서만 써도 됨)
+    // 3) 게이트(백엔드 판정)
     if (url.pathname === "/api/check-gate" && req.method === "POST") {
-      const body = await req.json().catch(()=>({}));
-      const userId = String(body.userId || "");
-      const code   = body.code ? String(body.code) : undefined;
+      const body = await req.json().catch(() => ({}));
+      const userId = String((body as any).userId || "");
+      const code   = (body as any).code ? String((body as any).code) : undefined;
 
       const { allow, invites } = parseLists(env);
       const invited = code && Array.isArray(invites[code]) && invites[code].includes(userId);
+
       if (allow.has(userId) || invited) {
         const token = await signJWT({ userId }, env.JWT_SECRET);
-        return new Response(JSON.stringify({ ok:true }), {
-          headers: { 
-            "content-type":"application/json",
+        return respond(new Response(JSON.stringify({ ok:true }), {
+          headers: {
+            "content-type": "application/json",
             "Set-Cookie": cookieSerialize("xgate", token, { maxAge: 60*60*24*7 }) // 7일
           }
-        });
+        }));
       }
-      return json({ ok:false }, { status: 403 });
+      return jsonRespond({ ok:false }, { status: 403 });
     }
 
-    // 4) 로그인 시작 (여기서 X OAuth 2.0 Authorization Code with PKCE 시작)
+    // 4) 로그인 시작 (OAuth PKCE 시작 지점)
     if (url.pathname === "/auth/login") {
       // TODO: state/pkce 생성 후 X로 리다이렉트
-      // 데모: 아직 OAuth 미연결 상태라 홈으로 안내
       return Response.redirect(env.HOME_PAGE_URL, 302);
     }
 
     // 5) OAuth 콜백
     if (url.pathname === "/auth/callback") {
       // TODO:
-      // - code 교환 → 사용자 프로필 얻기 → "숫자 userId" 추출
-      // - 아래 userId에 실제 값 넣기
-      const userId = ""; // ← 트위터 숫자 ID를 여기 세팅
+      // - code 교환 → 사용자 프로필 → "숫자 userId" 추출
+      const userId = ""; // ← 트위터 숫자 ID로 교체
 
-      const code = url.searchParams.get("invite") || undefined; // 필요 시 쿼리로 초대코드 전송
+      const code = url.searchParams.get("invite") || undefined;
       const { allow, invites } = parseLists(env);
       const invited = code && Array.isArray(invites[code]) && invites[code].includes(userId);
 
       if (userId && (allow.has(userId) || invited)) {
         const token = await signJWT({ userId }, env.JWT_SECRET);
+        // 콜백은 브라우저 네비게이션(리다이렉트)이므로 CORS 불필요
         return new Response(null, {
           status: 302,
           headers: {
@@ -137,14 +182,6 @@ export default {
       return Response.redirect(env.HOME_PAGE_URL, 302);
     }
 
-    return new Response("OK");
+    return respond(new Response("OK"));
   }
 };
-
-function withCORS(res: Response, origin: string) {
-  const h = new Headers(res.headers);
-  h.set("Access-Control-Allow-Origin", origin); // 정확한 오리진(별표 X)
-  h.set("Access-Control-Allow-Credentials", "true");
-  h.set("Vary", "Origin");
-  return new Response(res.body, { ...res, headers: h });
-}
