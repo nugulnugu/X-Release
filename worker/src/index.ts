@@ -119,11 +119,7 @@ function getAllowedOrigin(reqOrigin: string | null, env: Env) {
 
 
 /* ---------- PKCE helpers ---------- */
-function base64url(buf: ArrayBuffer | Uint8Array) {
-  const arr = buf instanceof ArrayBuffer ? new Uint8Array(buf) : buf;
-  const b64 = btoa(String.fromCharCode(...arr));
-  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
+
 function randStr(len = 32) {
   const arr = new Uint8Array(len);
   crypto.getRandomValues(arr);
