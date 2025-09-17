@@ -15,9 +15,7 @@ INVITES_JSON = '{"CODE123":["1111","2222"],"BETA999":["3333"]}'
 # GitHub Pages에서 보호페이지 파일 경로 (리다이렉트 목적)
 PROTECTED_PAGE_URL = "https://nugulnugu.github.io/X-Release/protected.html"
 HOME_PAGE_URL      = "https://nugulnugu.github.io/X-Release/"
-
-[env.production.vars]
-ALLOWED_ORIGIN = "https://nugulnugu.github.io"
+ALLOWED_ORIGIN     = "https://nugulnugu.github.io"
 
 # 아래 비밀키들은 대시보드에 환경변수로 바인딩 권장(또는 wrangler secret)
 # X_CLIENT_ID, X_CLIENT_SECRET, JWT_SECRET, OAUTH_REDIRECT_URL 등
