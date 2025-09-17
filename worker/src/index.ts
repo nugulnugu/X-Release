@@ -94,9 +94,17 @@ function applyCORS(res: Response, origin: string) {
 
 export default {
   async fetch(req: Request, env: Env) {
+    if (url.pathname === "/__debug/cors") {
+      return new Response(JSON.stringify({
+        origin: req.headers.get("Origin"),
+        allowed_env: env.ALLOWED_ORIGIN
+      }), { headers: { "content-type": "application/json" } });
+    }
     // fetch 내부 상단에 임시 로그 추가
     console.log("CORS origin =", req.headers.get("Origin"));
     console.log("allowed =", allowOrigin);
+
+    
 
     const url = new URL(req.url);
     const reqOrigin = req.headers.get("Origin");
