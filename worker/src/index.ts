@@ -78,13 +78,19 @@ function isAllowedOrigin(origin: string | null, env: Env) {
   const list = splitOrigins(env.ALLOWED_ORIGIN);
   return list.length ? list.includes(origin) : false;
 }
-function withCORS(res: Response, origin: string) {
+
+function applyCORS(res: Response, origin: string) {
   const h = new Headers(res.headers);
-  h.set("Access-Control-Allow-Origin", origin); // 정확한 오리진
+  h.set("Access-Control-Allow-Origin", origin);
   h.set("Access-Control-Allow-Credentials", "true");
   h.set("Vary", "Origin");
-  return new Response(res.body, { ...res, headers: h });
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers: h,
+  });
 }
+
 
 export default {
   async fetch(req: Request, env: Env) {
@@ -94,7 +100,7 @@ export default {
     const allowed = isAllowedOrigin(origin, env) ? origin! : null;
 
     // 공통 래퍼: 허용 오리진이면 CORS 헤더를 붙여 반환
-    const respond = (res: Response) => (allowed ? withCORS(res, allowed) : res);
+    const respond = (res: Response) => (allowed ? applyCORS(res, allowed) : res);
     const jsonRespond = (data: any, init: ResponseInit = {}) => respond(json(data, init));
 
     // --- OPTIONS 프리플라이트 처리 ---
