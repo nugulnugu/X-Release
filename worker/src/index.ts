@@ -308,9 +308,12 @@ export default {
           return new Response(null, {
             status: 302,
             headers: {
-              "Set-Cookie": [cookieSerialize("xgate", token, { maxAge: 60 * 60 * 24 * 7 }), ...clearTmp].join(", "),
-              Location: env.PROTECTED_PAGE_URL,
-            },
+              "Set-Cookie": [
+                cookieSerialize("xgate", token, { maxAge: 60 * 60 * 24 * 7 }),
+                ...clearTmp
+              ].join(", "),
+              "Location": env.PROTECTED_PAGE_URL
+            }
           });
         }
 
@@ -318,8 +321,8 @@ export default {
           status: 302,
           headers: {
             "Set-Cookie": clearTmp.join(", "),
-            Location: env.HOME_PAGE_URL,
-          },
+            "Location": env.HOME_PAGE_URL
+          }
         });
       }
 
