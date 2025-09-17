@@ -63,7 +63,7 @@ function cookieSerialize(name: string, value: string, opt: { maxAge?: number } =
     "Path=/",
     "HttpOnly",
     "Secure",
-    "SameSite=None" // ← Lax이면 cross-site fetch에 쿠키가 안 실립니다.
+    "SameSite=None; Secure; HttpOnly" // ← Lax이면 cross-site fetch에 쿠키가 안 실립니다.
   ];
   if (opt.maxAge) attrs.push(`Max-Age=${opt.maxAge}`);
   return attrs.join("; ");
