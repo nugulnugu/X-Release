@@ -52,7 +52,8 @@
       const res = await fetch(WORKER_BASE + "/api/check-gate", {
         method: "POST",
         headers: { "Content-Type":"application/json" },
-        body: JSON.stringify({ userId, code })
+        body: JSON.stringify({ userId, code }),
+        credentials: "include"
       });
       const j = await res.json().catch(()=>({}));
       if (j.ok) {
