@@ -33,6 +33,7 @@
       if (!res.ok) {
         alert("세션이 없거나 만료되었습니다.");
         location.href = "./index.html";
+        credentials: "include"
       }
     })();
 
