@@ -69,68 +69,63 @@ function cookieSerialize(name: string, value: string, opt: { maxAge?: number } =
   return attrs.join("; ");
 }
 
-// ----- CORS 유틸 -----
-function splitOrigins(val?: string) {
-  return (val || "").split(",").map(s => s.trim()).filter(Boolean);
-}
-function isAllowedOrigin(origin: string | null, env: Env) {
-  if (!origin) return false;
-  const list = splitOrigins(env.ALLOWED_ORIGIN);
-  return list.length ? list.includes(origin) : false;
-}
 
+// ===== CORS 헬퍼들 (안전 복제) =====
 function applyCORS(res: Response, origin: string) {
   const h = new Headers(res.headers);
   h.set("Access-Control-Allow-Origin", origin);
   h.set("Access-Control-Allow-Credentials", "true");
   h.set("Vary", "Origin");
-  return new Response(res.body, {
-    status: res.status,
-    statusText: res.statusText,
-    headers: h,
-  });
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
 }
+function splitOrigins(val?: string) {
+  return (val || "").split(",").map(s => s.trim()).filter(Boolean);
+}
+function getAllowedOrigin(reqOrigin: string | null, env: Env) {
+  if (!reqOrigin) return null;
+  const list = splitOrigins(env.ALLOWED_ORIGIN);
+  return list.length && list.includes(reqOrigin) ? reqOrigin : null;
+}
+
 
 
 export default {
   async fetch(req: Request, env: Env) {
-    if (url.pathname === "/__debug/cors") {
-      return new Response(JSON.stringify({
-        origin: req.headers.get("Origin"),
-        allowed_env: env.ALLOWED_ORIGIN
-      }), { headers: { "content-type": "application/json" } });
-    }
-    // fetch 내부 상단에 임시 로그 추가
-    console.log("CORS origin =", req.headers.get("Origin"));
-    console.log("allowed =", allowOrigin);
-
-    
-
     const url = new URL(req.url);
     const reqOrigin = req.headers.get("Origin");
     const allowOrigin = getAllowedOrigin(reqOrigin, env);
 
-    // 공통 래퍼: 허용 오리진이면 CORS 헤더를 붙여 반환
     const respond = (res: Response) => (allowOrigin ? applyCORS(res, allowOrigin) : res);
-      const jsonRespond = (data: any, init: ResponseInit = {}) =>
-        respond(new Response(JSON.stringify(data), { headers: { "content-type": "application/json" }, ...init }));
+    const jsonRespond = (obj: any, init: ResponseInit = {}) =>
+      respond(new Response(JSON.stringify(obj), { headers: { "content-type":"application/json" }, ...init }));
 
-    // --- OPTIONS 프리플라이트 처리 ---
+    // --- (A) 디버그 라우트: 현재 CORS 설정 확인 ---
+    if (url.pathname === "/__debug/cors") {
+      const info = {
+        origin: reqOrigin,                   // 이 요청의 Origin
+        allowed_env: env.ALLOWED_ORIGIN || null, // wrangler.toml [vars]
+        method: req.method
+      };
+      return jsonRespond(info); // CORS 헤더(있으면)까지 붙여서 반환
+    }
+    
+    // --- (B) OPTIONS 프리플라이트 ---
     if (req.method === "OPTIONS") {
-        if (allowOrigin) {
-          const acrh = req.headers.get("Access-Control-Request-Headers") || "content-type";
-          return new Response(null, {
-            headers: {
-              "Access-Control-Allow-Origin": allowOrigin,
-              "Access-Control-Allow-Credentials": "true",
-              "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-              "Access-Control-Allow-Headers": acrh,
-              "Vary": "Origin",
-            },
-          });
-        }
-        return new Response(null, { status: 204 });
+      if (allowOrigin) {
+        const acrh = req.headers.get("Access-Control-Request-Headers") || "content-type";
+        return new Response(null, {
+          headers: {
+            "Access-Control-Allow-Origin": allowOrigin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+            "Access-Control-Allow-Headers": acrh,
+            "Vary": "Origin"
+          }
+        });
       }
+      // 허용 오리진이 아니면 헤더 없이 204 → 브라우저가 CORS 에러를 띄움(의도된 동작)
+      return new Response(null, { status: 204 });
+    }
 
     // 1) 세션 확인
     if (url.pathname === "/api/check-session") {
